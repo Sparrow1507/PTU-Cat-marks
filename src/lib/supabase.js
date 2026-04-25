@@ -1,12 +1,14 @@
-// ─── SUPABASE CLIENT ─────────────────────────────────────────────────────────
-// Replace the values below with your Supabase project URL and anon key.
-// You can find these in: Supabase Dashboard → Your Project → Settings → API
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// 💡 NEW: Background client for creating accounts without logging the Admin out!
+export const authAdminClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false }
+});
 
 // ─── DB HELPERS (all async) ───────────────────────────────────────────────────
 export const db = {

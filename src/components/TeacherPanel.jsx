@@ -3,7 +3,6 @@ import { db } from "../lib/supabase.js";
 import { Sidebar, MainContent } from "./Sidebar.jsx";
 import { FormManager } from "./FormManager.jsx";
 import { StatCard, Spinner } from "./UI.jsx";
-// ─── NEW: Import Icons ────────────────────────────────────────────────────────
 import { LayoutDashboard, ClipboardList, GraduationCap, CheckCircle } from "lucide-react";
 
 export function TeacherPanel({ user, onLogout }) {
@@ -31,7 +30,6 @@ export function TeacherPanel({ user, onLogout }) {
     load();
   }, [view, user.id]);
 
-  // Replaced emojis with Lucide icons
   const navItems = [
     { key: "dashboard", icon: <LayoutDashboard size={20} strokeWidth={1.5} />, label: "Dashboard" },
     { key: "forms",     icon: <ClipboardList size={20} strokeWidth={1.5} />, label: "My Forms" },
@@ -48,7 +46,8 @@ export function TeacherPanel({ user, onLogout }) {
             </h2>
             <p style={{ color: "var(--text-secondary)", marginBottom: "28px", fontSize: "14px" }}>Here's a snapshot of your activity.</p>
             {loading ? <Spinner /> : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(170px,1fr))", gap: "16px" }}>
+              // 💡 FIX: Adjusted minmax size from 170px to 140px to ensure it fits easily on mobile!
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "16px" }}>
                 <StatCard icon={<ClipboardList size={32} strokeWidth={1.5} />} label="My Forms"   value={stats.forms}     color="var(--accent)" />
                 <StatCard icon={<GraduationCap size={32} strokeWidth={1.5} />} label="Students"   value={stats.students}  color="var(--warning)" />
                 <StatCard icon={<CheckCircle size={32} strokeWidth={1.5} />}   label="Responses"  value={stats.responses} color="var(--success)" />
