@@ -45,7 +45,6 @@ export function FormManager({ user, isAdmin }) {
 
   return (
     <div className="fade-in">
-      {/* 💡 FIX: Added Media Query for responsive FormCards */}
       <style>{`
         .form-card-layout { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
         .form-card-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
@@ -85,7 +84,6 @@ function FormCard({ form: f, onEdit, onStudents, onResponses, onDelete }) {
   }, [f.id]);
 
   return (
-    // 💡 FIX: Uses the CSS classes defined above to handle layout automatically
     <Card className="form-card-layout" style={{ marginBottom: "16px" }}>
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px", flexWrap: "wrap" }}>
@@ -130,12 +128,14 @@ function FormBuilder({ form: initialForm, onBack }) {
   const addCat = () => { const c = [...(form.cats||[]), { id: uid(), label: `CAT ${(form.cats?.length||0)+1}`, subjects: [] }]; upd("cats", c); };
   const removeCat = (cId) => upd("cats", form.cats.filter(c => c.id !== cId));
   const updCat = (cId, k, v) => upd("cats", form.cats.map(c => c.id === cId ? {...c,[k]:v} : c));
-  const addSubject = (cId) => upd("cats", form.cats.map(c => c.id === cId ? {...c, subjects:[...(c.subjects||[]),{id:uid(),name:"New Subject",questions:[]}]} : c));
+  const addSubject = (cId) => upd("cats", form.cats.map(c => c.id === cId ? {...c, subjects:[...(c.subjects||[]),{id:uid(),name:"New Subject",overrideMax:"",questions:[]}]} : c));
   const removeSubject = (cId,sId) => upd("cats", form.cats.map(c => c.id === cId ? {...c,subjects:c.subjects.filter(s=>s.id!==sId)} : c));
   const updSubject = (cId,sId,k,v) => upd("cats", form.cats.map(c => c.id === cId ? {...c,subjects:c.subjects.map(s=>s.id===sId?{...s,[k]:v}:s)} : c));
+  
+  // 💡 NEW: Questions now have isChoice: false by default
   const addQuestion = (cId,sId) => {
     const sub = form.cats.find(c=>c.id===cId)?.subjects?.find(s=>s.id===sId);
-    const q = { id:uid(), label:`Q${(sub?.questions?.length||0)+1}`, maxMarks:10, required:true };
+    const q = { id:uid(), label:`Q${(sub?.questions?.length||0)+1}`, maxMarks:10, required:true, isChoice: false };
     upd("cats", form.cats.map(c=>c.id===cId?{...c,subjects:c.subjects.map(s=>s.id===sId?{...s,questions:[...(s.questions||[]),q]}:s)}:c));
   };
   const removeQuestion = (cId,sId,qId) => upd("cats", form.cats.map(c=>c.id===cId?{...c,subjects:c.subjects.map(s=>s.id===sId?{...s,questions:s.questions.filter(q=>q.id!==qId)}:s)}:c));
@@ -210,14 +210,25 @@ function FormBuilder({ form: initialForm, onBack }) {
                 <Card key={sub.id} accent="var(--warning)" style={{ marginLeft: "16px", marginBottom: "10px" }}>
                   <div style={{ display: "flex", gap: "10px", marginBottom: "12px", alignItems: "center", flexWrap: "wrap" }}>
                     <input value={sub.name} onChange={e => updSubject(cat.id,sub.id,"name",e.target.value)} placeholder="Subject Name" style={{ flex: "1 1 150px" }} />
+                    
+                    {/* 💡 NEW: Override Max Marks Input */}
+                    <input type="number" value={sub.overrideMax || ""} onChange={e => updSubject(cat.id,sub.id,"overrideMax",e.target.value)} placeholder="Max Marks (Optional)" style={{ width: "160px", fontSize: "13px", padding: "6px 8px" }} title="Leave blank to auto-calculate from questions" />
+                    
                     <Btn variant="primary" onClick={() => addQuestion(cat.id,sub.id)}><Plus size={14} strokeWidth={2.5} /> Q</Btn>
                     <Btn variant="danger" onClick={() => removeSubject(cat.id,sub.id)}><Trash2 size={14} /></Btn>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: "8px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: "8px" }}>
                     {(sub.questions||[]).map(q => (
                       <div key={q.id} style={{ background: "var(--bg-elevated)", borderRadius: "8px", padding: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-                        <input style={{ flex: 1, padding: "6px 8px", fontSize: "13px" }} value={q.label} onChange={e => updQuestion(cat.id,sub.id,q.id,"label",e.target.value)} />
+                        <input style={{ flex: 1, padding: "6px 8px", fontSize: "13px", minWidth: "60px" }} value={q.label} onChange={e => updQuestion(cat.id,sub.id,q.id,"label",e.target.value)} />
                         <input style={{ width: "60px", padding: "6px 8px", fontSize: "13px" }} type="number" value={q.maxMarks} onChange={e => updQuestion(cat.id,sub.id,q.id,"maxMarks",e.target.value)} title="Max Marks" />
+                        
+                        {/* 💡 NEW: Choice Checkbox */}
+                        <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--text-muted)", cursor: "pointer", whiteSpace: "nowrap" }}>
+                          <input type="checkbox" checked={!!q.isChoice} onChange={e => updQuestion(cat.id,sub.id,q.id,"isChoice",e.target.checked)} style={{ width: "auto" }} />
+                          Choice Q?
+                        </label>
+
                         <button style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => removeQuestion(cat.id,sub.id,q.id)}>
                           <Trash2 size={16} />
                         </button>
@@ -225,8 +236,9 @@ function FormBuilder({ form: initialForm, onBack }) {
                     ))}
                   </div>
                   {(sub.questions||[]).length > 0 && (
-                    <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--text-muted)" }}>
-                      Total Max: {sub.questions.reduce((a,q)=>a+Number(q.maxMarks||0),0)} marks
+                    <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--text-muted)", display: "flex", gap: "12px" }}>
+                      <span>Questions Sum: {sub.questions.reduce((a,q)=>a+Number(q.maxMarks||0),0)} marks</span>
+                      {sub.overrideMax && <span style={{ color: "var(--success)", fontWeight: 600 }}>Using Overridden Max: {sub.overrideMax} marks</span>}
                     </div>
                   )}
                 </Card>
@@ -260,8 +272,23 @@ function FormPreview({ form }) {
         </select>
       </div>
       {catId && <div style={{ marginBottom: "14px" }}><Label>Select Subject</Label><select value={subjectId} onChange={e=>setSubjectId(e.target.value)}><option value="">-- Select Subject --</option>{selectedCat?.subjects?.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>}
+      
+      {/* 💡 NEW: Shows Dropdown if Choice Question */}
       {selectedSubject?.questions?.map(q=>(
-        <div key={q.id} style={{ marginBottom: "14px" }}><Label>{q.label} (Max: {q.maxMarks})</Label><input type="number" disabled placeholder="Enter marks" /></div>
+        <div key={q.id} style={{ marginBottom: "14px" }}>
+          <Label>{q.label} (Max: {q.maxMarks})</Label>
+          {q.isChoice ? (
+            <select disabled style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--bg-input)" }}>
+              <option value="">Select marks or NA...</option>
+              <option value="NA">NA (Left in choice)</option>
+              {Array.from({ length: Number(q.maxMarks) + 1 }, (_, i) => (
+                <option key={i} value={i}>{i}</option>
+              ))}
+            </select>
+          ) : (
+            <input type="number" disabled placeholder="Enter marks" />
+          )}
+        </div>
       ))}
       <Btn variant="primary" disabled style={{ opacity: 0.6, cursor: "not-allowed", width: "100%", justifyContent: "center" }}>Submit (Preview Mode)</Btn>
     </Card>
@@ -374,7 +401,13 @@ export function StudentManager({ form, onBack }) {
   );
 }
 
-// ─── RESPONSE VIEWER ──────────────────────────────────────────────────────────
+// ─── RESPONSE VIEWER & HELPER ────────────────────────────────────────────────
+// 💡 NEW HELPER: Handles math for Subject Override vs Auto-Sum
+const getSubjectMax = (sub) => {
+  if (sub.overrideMax && Number(sub.overrideMax) > 0) return Number(sub.overrideMax);
+  return sub.questions?.reduce((a, q) => a + Number(q.maxMarks || 0), 0) || 0;
+};
+
 export function ResponseViewer({ form, onBack }) {
   const [responses, setResponses] = useState([]);
   const [answers, setAnswers] = useState([]);
@@ -410,10 +443,16 @@ export function ResponseViewer({ form, onBack }) {
     form.cats?.forEach(cat => {
       cat.subjects?.forEach(sub => {
         const subResps = responses.filter(r => r.catId===cat.id && r.subjectId===sub.id);
-        const maxTotal = sub.questions?.reduce((a,q)=>a+Number(q.maxMarks||0),0)||0;
+        const maxTotal = getSubjectMax(sub); // 💡 Updated to use helper
+        
         const totals = subResps.map(resp => {
           const ra = answers.filter(a=>a.responseId===resp.id);
-          return sub.questions?.reduce((sum,q)=>{ const a=ra.find(a=>a.questionId===q.id); return sum+(a?Number(a.value):0); },0)||0;
+          return sub.questions?.reduce((sum,q)=>{ 
+            const a = ra.find(a=>a.questionId===q.id); 
+            // 💡 NEW: NA counts as 0 for math
+            const val = a && a.value !== "NA" ? Number(a.value) : 0;
+            return sum + val; 
+          },0)||0;
         });
         map[`${cat.label}||${sub.name}`] = { count:totals.length, avg:totals.length?(totals.reduce((a,b)=>a+b,0)/totals.length).toFixed(1):0, maxTotal };
       });
@@ -447,7 +486,6 @@ export function ResponseViewer({ form, onBack }) {
         <Btn variant="success" onClick={exportExcel}><Download size={16} /> Export Excel</Btn>
       </div>
 
-      {/* Analytics */}
       {Object.keys(analytics).length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: "12px", marginBottom: "24px" }}>
           {Object.entries(analytics).map(([key,val]) => {
@@ -499,91 +537,63 @@ export function ResponseViewer({ form, onBack }) {
               </thead>
               <tbody>
                 {filtered.map(resp => {
-  const student = students.find(s => s.id === resp.studentId);
-  const cat = form.cats?.find(c => c.id === resp.catId);
-  const subject = cat?.subjects?.find(s => s.id === resp.subjectId);
-  const ra = answers.filter(a => a.responseId === resp.id);
+                  const student = students.find(s => s.id === resp.studentId);
+                  const cat = form.cats?.find(c => c.id === resp.catId);
+                  const subject = cat?.subjects?.find(s => s.id === resp.subjectId);
+                  const ra = answers.filter(a => a.responseId === resp.id);
 
-  const maxTotal = subject?.questions?.reduce((a, q) => a + Number(q.maxMarks || 0), 0) || 0;
+                  const maxTotal = getSubjectMax(subject); // 💡 Updated
 
-  const isAbsent = resp.attendance === "absent";
+                  const isAbsent = resp.attendance === "absent";
 
-  const total = isAbsent
-    ? 0
-    : subject?.questions?.reduce((sum, q) => {
-        const a = ra.find(a => a.questionId === q.id);
-        return sum + (a ? Number(a.value) : 0);
-      }, 0) || 0;
+                  const total = isAbsent
+                    ? 0
+                    : subject?.questions?.reduce((sum, q) => {
+                        const a = ra.find(a => a.questionId === q.id);
+                        const val = a && a.value !== "NA" ? Number(a.value) : 0; // 💡 NA math safely handled
+                        return sum + val;
+                      }, 0) || 0;
 
-  const status = isAbsent ? "Absent" : "Present";
-  const color = isAbsent ? "red" : "green";
+                  const status = isAbsent ? "Absent" : "Present";
+                  const color = isAbsent ? "red" : "green";
 
-  return (
-    <tr key={resp.id} style={{ borderBottom: "1px solid var(--border)" }}>
-      
-      <td style={{ padding: "10px 12px", fontWeight: 600, color: "var(--text-primary)" }}>
-        {student?.name || "?"}
-      </td>
+                  return (
+                    <tr key={resp.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "10px 12px", fontWeight: 600, color: "var(--text-primary)" }}>{student?.name || "?"}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "DM Mono, monospace", color: "var(--accent)" }}>{student?.regNo}</td>
+                      <td style={{ padding: "10px 12px", color: "var(--text-secondary)" }}>{cat?.label}</td>
+                      <td style={{ padding: "10px 12px", color: "var(--text-secondary)" }}>{subject?.name}</td>
+                      
+                      <td style={{ padding: "10px 12px" }}>
+                        {isAbsent ? (
+                          <span style={{ color: "var(--danger)", fontWeight: 600 }}>Absent</span>
+                        ) : (
+                          subject?.questions?.map(q => {
+                            const a = ra.find(a => a.questionId === q.id);
+                            // 💡 Keeps NA visible in the UI table so you know they skipped it
+                            const displayVal = a?.value ?? "-";
+                            return (
+                              <span key={q.id} style={{ marginRight: "6px", fontSize: "12px", color: "var(--text-secondary)" }}>
+                                {q.label}:{displayVal}
+                              </span>
+                            );
+                          })
+                        )}
+                      </td>
 
-      <td style={{ padding: "10px 12px", fontFamily: "DM Mono, monospace", color: "var(--accent)" }}>
-        {student?.regNo}
-      </td>
-
-      <td style={{ padding: "10px 12px", color: "var(--text-secondary)" }}>
-        {cat?.label}
-      </td>
-
-      <td style={{ padding: "10px 12px", color: "var(--text-secondary)" }}>
-        {subject?.name}
-      </td>
-
-      <td style={{ padding: "10px 12px" }}>
-        {isAbsent ? (
-          <span style={{ color: "var(--danger)", fontWeight: 600 }}>Absent</span>
-        ) : (
-          subject?.questions?.map(q => {
-            const a = ra.find(a => a.questionId === q.id);
-            return (
-              <span key={q.id} style={{ marginRight: "6px", fontSize: "12px", color: "var(--text-secondary)" }}>
-                {q.label}:{a?.value ?? "-"}
-              </span>
-            );
-          })
-        )}
-      </td>
-
-      <td style={{
-        padding: "10px 12px",
-        fontWeight: 700,
-        color: isAbsent ? "var(--danger)" : "var(--success)"
-      }}>
-        {`${total}/${maxTotal}`}
-      </td>
-
-      <td style={{ padding: "10px 12px" }}>
-        <Badge color={color}>{status}</Badge>
-      </td>
-
-      <td style={{ padding: "10px 12px", fontSize: "11px", color: "var(--text-muted)" }}>
-        {resp.submittedAt
-          ? new Date(resp.submittedAt).toLocaleDateString()
-          : <Badge color="orange">Draft</Badge>
-        }
-      </td>
-
-      <td style={{ padding: "10px 12px" }}>
-        <Btn
-          variant="danger"
-          style={{ fontSize: "12px", padding: "6px" }}
-          onClick={() => deleteResponse(resp.id)}
-        >
-          <Trash2 size={14} />
-        </Btn>
-      </td>
-
-    </tr>
-  );
-})}
+                      <td style={{ padding: "10px 12px", fontWeight: 700, color: isAbsent ? "var(--danger)" : "var(--success)" }}>
+                        {`${total}/${maxTotal}`}
+                      </td>
+                      <td style={{ padding: "10px 12px" }}><Badge color={color}>{status}</Badge></td>
+                      <td style={{ padding: "10px 12px", fontSize: "11px", color: "var(--text-muted)" }}>
+                        {resp.submittedAt ? new Date(resp.submittedAt).toLocaleDateString() : <Badge color="orange">Draft</Badge>}
+                      </td>
+                      <td style={{ padding: "10px 12px" }}>
+                        <Btn variant="danger" style={{ fontSize: "12px", padding: "6px" }} onClick={() => deleteResponse(resp.id)}><Trash2 size={14} /></Btn>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -611,12 +621,12 @@ function buildWorkbook(form, responses, answers, students) {
     const cat = form.cats?.find(c => c.id === resp.catId);
     const subject = cat?.subjects?.find(s => s.id === resp.subjectId);
     const ra = answers.filter(a => a.responseId === resp.id);
-
     const isAbsent = resp.attendance === "absent";
 
     subject?.questions?.forEach(q => {
       const a = ra.find(a => a.questionId === q.id);
-      const value = isAbsent ? 0 : (a ? Number(a.value) : 0);
+      // 💡 In "All Marks" sheet, let's explicitly show the text "NA" so admins know it was a choice question
+      const displayValue = isAbsent ? "Absent" : (a?.value ?? "-");
 
       allMarks.push([
         student?.regNo,
@@ -624,7 +634,7 @@ function buildWorkbook(form, responses, answers, students) {
         cat?.label,
         subject?.name,
         q?.label,
-        value,
+        displayValue,
         q?.maxMarks,
         resp.submittedAt
       ]);
@@ -635,18 +645,12 @@ function buildWorkbook(form, responses, answers, students) {
 
   form.cats?.forEach(cat => {
     cat.subjects?.forEach(subject => {
-
-      const sr = responses.filter(r =>
-        r.catId === cat.id && r.subjectId === subject.id
-      );
+      const sr = responses.filter(r => r.catId === cat.id && r.subjectId === subject.id);
 
       const headers = [
-        "Reg No",
-        "Name",
+        "Reg No", "Name",
         ...subject.questions.map(q => `${q.label}(/${q.maxMarks})`),
-        "Total",
-        "Percentage",
-        "Status"
+        "Total", "Percentage", "Status"
       ];
 
       const rows = [headers];
@@ -654,46 +658,37 @@ function buildWorkbook(form, responses, answers, students) {
       sr.forEach(resp => {
         const student = students.find(s => s.id === resp.studentId);
         const ra = answers.filter(a => a.responseId === resp.id);
-
         const isAbsent = resp.attendance === "absent";
 
-        const marks = subject.questions.map(q => {
+        // 💡 NA Math mapped to 0 for sum calculation
+        const marksNumeric = subject.questions.map(q => {
           const a = ra.find(a => a.questionId === q.id);
-          return isAbsent ? 0 : (a ? Number(a.value) : 0);
+          return isAbsent ? 0 : (a && a.value !== "NA" ? Number(a.value) : 0);
         });
 
-        const total = isAbsent
-          ? 0
-          : marks.reduce((a, b) => a + b, 0);
+        // 💡 Export visual "NA" text into Excel instead of pretending they typed a 0
+        const marksVisual = subject.questions.map(q => {
+          const a = ra.find(a => a.questionId === q.id);
+          return isAbsent ? 0 : (a?.value ?? 0);
+        });
 
-        const maxTotal = subject.questions.reduce(
-          (a, q) => a + Number(q.maxMarks || 0),
-          0
-        );
+        const total = isAbsent ? 0 : marksNumeric.reduce((a, b) => a + b, 0);
+        const maxTotal = getSubjectMax(subject); // 💡 Use the new helper here too!
 
-        const percentage = isAbsent
-          ? "0%"
-          : maxTotal > 0
-            ? ((total / maxTotal) * 100).toFixed(1) + "%"
-            : "N/A";
-
+        const percentage = isAbsent ? "0%" : maxTotal > 0 ? ((total / maxTotal) * 100).toFixed(1) + "%" : "N/A";
         const status = isAbsent ? "Absent" : "Present";
 
         rows.push([
           student?.regNo,
           student?.name,
-          ...marks,
+          ...marksVisual,
           total,
           percentage,
           status
         ]);
       });
 
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.aoa_to_sheet(rows),
-        `${cat.label}-${subject.name}`.slice(0, 31)
-      );
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), `${cat.label}-${subject.name}`.slice(0, 31));
     });
   });
 

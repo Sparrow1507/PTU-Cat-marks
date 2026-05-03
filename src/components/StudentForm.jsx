@@ -2,7 +2,14 @@ import { useState, useEffect } from "react";
 import { db, uid } from "../lib/supabase.js";
 import { GlassCard, Btn, Label, Alert, Badge, Spinner, ThemeToggle } from "./UI.jsx";
 import { useTheme } from "../lib/theme.jsx";
-import { Search, Lock, GraduationCap, User, FileText, Edit2, CheckCircle2, XCircle, Save, AlertTriangle } from "lucide-react";
+import { Search, Lock, GraduationCap, User, FileText, Edit2, CheckCircle2, XCircle, Save, AlertTriangle, X } from "lucide-react";
+
+// ─── HELPER: GET MAX MARKS ────────────────────────────────────────────────────
+const getSubjectMax = (sub) => {
+  if (!sub) return 0;
+  if (sub.overrideMax && Number(sub.overrideMax) > 0) return Number(sub.overrideMax);
+  return sub.questions?.reduce((a, q) => a + Number(q.maxMarks || 0), 0) || 0;
+};
 
 // ─── GPAY SUCCESS ANIMATION COMPONENT ─────────────────────────────────────────
 const GPaySuccessAnimation = () => (
@@ -86,7 +93,7 @@ export function PublicFormPage({ slug }) {
   );
 
   if (!student) return <Wrapper><StudentLogin form={form} onLogin={setStudent} /></Wrapper>;
-  return <Wrapper><StudentForm form={form} student={student} /></Wrapper>;
+  return <Wrapper><StudentForm form={form} student={student} onLogout={() => setStudent(null)} /></Wrapper>;
 }
 
 // ─── STUDENT LOGIN ────────────────────────────────────────────────────────────
@@ -138,10 +145,10 @@ function StudentLogin({ form, onLogin }) {
 }
 
 // ─── STUDENT FORM ─────────────────────────────────────────────────────────────
-function StudentForm({ form, student }) {
+function StudentForm({ form, student, onLogout }) {
   const [catId, setCatId] = useState("");
   const [subjectId, setSubjectId] = useState("");
-  const [attendance, setAttendance] = useState(null); // null | "present" | "absent"
+  const [attendance, setAttendance] = useState(null); 
   const [marks, setMarks] = useState({});
   const [errors, setErrors] = useState({});
   const [existingResp, setExistingResp] = useState(null);
@@ -193,8 +200,11 @@ function StudentForm({ form, student }) {
     selectedSubject?.questions?.forEach(q => {
       const val = marks[q.id];
       if (val === undefined || val === "") { errs[q.id] = "Required"; return; }
-      if (Number(val) < 0) { errs[q.id] = "Cannot be negative"; return; }
-      if (Number(val) > Number(q.maxMarks)) { errs[q.id] = `Max is ${q.maxMarks}`; }
+      
+      if (val !== "NA") {
+        if (Number(val) < 0) { errs[q.id] = "Cannot be negative"; return; }
+        if (Number(val) > Number(q.maxMarks)) { errs[q.id] = `Max is ${q.maxMarks}`; }
+      }
     });
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -253,17 +263,45 @@ function StudentForm({ form, student }) {
     setSaving(false);
   };
 
-  const total = attendance === "absent" ? 0 : Object.values(marks).reduce((a, b) => a + (Number(b) || 0), 0);
-  const maxTotal = selectedSubject?.questions?.reduce((a, q) => a + Number(q.maxMarks || 0), 0) || 0;
+  const total = attendance === "absent" ? 0 : Object.values(marks).reduce((a, b) => {
+    return a + (b === "NA" ? 0 : (Number(b) || 0));
+  }, 0);
+  
+  const maxTotal = getSubjectMax(selectedSubject);
 
   return (
     <GlassCard style={{ padding: "36px" }} className="fade-in">
       {/* Header */}
-      <div style={{ marginBottom: "24px" }}>
-        <h2 style={{ fontWeight: 800, fontSize: "20px", color: "var(--text-primary)", marginBottom: "4px" }}>{form.title}</h2>
-        <div style={{ fontSize: "13px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "4px" }}>
-          <User size={14} /> {student.name} <span style={{ margin: "0 4px" }}>·</span> <span style={{ color: "var(--accent)", fontFamily: "DM Mono, monospace" }}>{student.regNo}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px" }}>
+        <div>
+          <h2 style={{ fontWeight: 800, fontSize: "20px", color: "var(--text-primary)", marginBottom: "4px" }}>{form.title}</h2>
+          <div style={{ fontSize: "13px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "4px" }}>
+            <User size={14} /> {student.name} <span style={{ margin: "0 4px" }}>·</span> <span style={{ color: "var(--accent)", fontFamily: "DM Mono, monospace" }}>{student.regNo}</span>
+          </div>
         </div>
+        
+        {/* Close / Logout Button */}
+        <button 
+          onClick={onLogout}
+          title="Sign Out"
+          style={{
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            width: "32px",
+            height: "32px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "50%",
+            transition: "all 0.2s"
+          }}
+          onMouseOver={(e) => { e.currentTarget.style.color = "var(--danger)"; e.currentTarget.style.borderColor = "var(--danger)"; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.borderColor = "var(--border)"; }}
+        >
+          <X size={18} strokeWidth={2.5} />
+        </button>
       </div>
 
       {/* CAT select */}
@@ -378,13 +416,33 @@ function StudentForm({ form, student }) {
                         {q.required && <span style={{ color: "var(--danger)" }}> *</span>}
                         {errors[q.id] && <span style={{ color: "var(--danger)", marginLeft: "6px", textTransform: "none", letterSpacing: "normal" }}>{errors[q.id]}</span>}
                       </Label>
-                      <input
-                        type="number" min={0} max={q.maxMarks}
-                        value={marks[q.id] ?? ""}
-                        onChange={e => { setMarks(m => ({...m,[q.id]:e.target.value})); setErrors(er => ({...er,[q.id]:""})); }}
-                        placeholder={`0 – ${q.maxMarks}`}
-                        style={{ borderColor: errors[q.id] ? "var(--danger)" : undefined }}
-                      />
+                      
+                      {q.isChoice ? (
+                        <select
+                          value={marks[q.id] ?? ""}
+                          onChange={e => { setMarks(m => ({...m,[q.id]:e.target.value})); setErrors(er => ({...er,[q.id]:""})); }}
+                          style={{ 
+                            width: "100%", padding: "10px", borderRadius: "8px", 
+                            border: `1px solid ${errors[q.id] ? "var(--danger)" : "var(--border)"}`, 
+                            background: "var(--input-bg)", color: "var(--text-primary)", outline: "none",
+                            fontFamily: "inherit", fontSize: "14px"
+                          }}
+                        >
+                          <option value="" disabled>Select marks or NA...</option>
+                          <option value="NA">NA (Left in choice)</option>
+                          {Array.from({ length: Number(q.maxMarks) + 1 }, (_, i) => (
+                            <option key={i} value={i}>{i}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="number" min={0} max={q.maxMarks}
+                          value={marks[q.id] ?? ""}
+                          onChange={e => { setMarks(m => ({...m,[q.id]:e.target.value})); setErrors(er => ({...er,[q.id]:""})); }}
+                          placeholder={`0 – ${q.maxMarks}`}
+                          style={{ borderColor: errors[q.id] ? "var(--danger)" : undefined }}
+                        />
+                      )}
                     </div>
                   ))}
 
